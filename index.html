@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Box メタデータビューア - Box Metadata Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- ヘッダー -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-badge">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Box メタデータビューア</h1>
+          <p class="brand-subtitle">Boxフォルダ内のファイル一覧と付与されたメタデータをリスト表示</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="helpToggleBtn" class="btn btn-secondary btn-sm" type="button" aria-expanded="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          利用手順・ヘルプ
+        </button>
+      </div>
+    </header>
+
+    <!-- ヘルプ・ガイダンスカード -->
+    <div id="helpGuideCard" class="card guide-card hidden">
+      <div class="guide-header">
+        <h3>💡 Box連携の手順とCORS設定</h3>
+        <button id="closeGuideBtn" class="icon-btn" aria-label="閉じる">&times;</button>
+      </div>
+      <div class="guide-steps">
+        <div class="guide-step">
+          <span class="step-num">1</span>
+          <div>
+            <strong>Box開発者コンソールでアプリを作成</strong>
+            <p><a href="https://app.box.com/developers/console" target="_blank" rel="noopener">Box Developer Console</a> にアクセスし、「カスタムアプリ」を作成します。</p>
+          </div>
+        </div>
+        <div class="guide-step">
+          <span class="step-num">2</span>
+          <div>
+            <strong>CORSドメインに本アプリのURLを追加 (必須)</strong>
+            <p>アプリの「構成」タブにある「CORSドメイン」欄に <code>http://localhost:8000</code> を追加して保存してください（ブラウザからの直接アクセスに必要です）。</p>
+          </div>
+        </div>
+        <div class="guide-step">
+          <span class="step-num">3</span>
+          <div>
+            <strong>開発者トークンを発行・入力</strong>
+            <p>アプリの「構成」タブにある「開発者トークンを生成」ボタンを押し、コピーしたトークンを下部フォームに貼り付けます（有効期間1時間）。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 接続設定フォーム -->
+    <section class="card config-card">
+      <form id="fetchForm" class="config-grid">
+        <div class="form-group flex-2">
+          <label for="devToken">
+            開発者トークン (Developer Token)
+            <span class="badge badge-required">必須</span>
+          </label>
+          <div class="input-wrapper">
+            <input type="password" id="devToken" placeholder="Box Developer Consoleで生成したトークンを入力" required autocomplete="off">
+            <button type="button" id="toggleTokenVisibility" class="input-action-btn" title="トークンの表示/非表示">
+              <svg id="eyeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group flex-1">
+          <label for="folderId">
+            対象フォルダID
+            <span class="badge badge-required">必須</span>
+          </label>
+          <input type="text" id="folderId" placeholder="例: 1234567890 またはフォルダURL" required>
+        </div>
+
+        <div class="form-group action-group">
+          <label class="invisible-label">アクション</label>
+          <button type="submit" id="fetchBtn" class="btn btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            メタデータを取得
+          </button>
+        </div>
+      </form>
+      <div class="config-footer">
+        <span class="save-status" id="saveStatus">トークンとフォルダIDはブラウザ（ローカル）に自動保存されます</span>
+        <div class="footer-links">
+          <button type="button" id="loadDemoBtn" class="btn-text">デモデータでプレビュー</button>
+          <span class="divider">|</span>
+          <button type="button" id="clearStorageBtn" class="btn-text">設定をクリア</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- エラー・通知バナー -->
+    <div id="statusBanner" class="alert-banner hidden">
+      <div class="alert-icon" id="bannerIcon"></div>
+      <div class="alert-content">
+        <h4 id="bannerTitle">エラー</h4>
+        <p id="bannerMessage"></p>
+      </div>
+      <button id="closeBannerBtn" class="icon-btn">&times;</button>
+    </div>
+
+    <!-- コンテンツ表示エリア -->
+    <main class="card main-card">
+      <!-- ツールバー（検索・件数・エクスポート） -->
+      <div class="toolbar">
+        <div class="search-box">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="searchInput" placeholder="ファイル名やメタデータで絞り込み..." disabled>
+        </div>
+
+        <div class="toolbar-meta">
+          <span class="badge badge-info" id="itemCountBadge">0 件</span>
+          <button type="button" id="exportCsvBtn" class="btn btn-secondary btn-sm" disabled>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            CSV保存
+          </button>
+        </div>
+      </div>
+
+      <!-- テーブル表示領域 -->
+      <div class="table-container" id="tableContainer">
+        <!-- 初期状態 (Empty state) -->
+        <div id="initialState" class="empty-state">
+          <div class="empty-icon">📁</div>
+          <h3>フォルダ内のメタデータを読み込みます</h3>
+          <p>上部の入力欄にBoxの開発者トークンとフォルダIDを入力し、「メタデータを取得」をクリックしてください。</p>
+        </div>
+
+        <!-- ローディングインジケーター -->
+        <div id="loadingState" class="loading-state hidden">
+          <div class="spinner"></div>
+          <p id="loadingText">Box APIからアイテム一覧とメタデータを取得中...</p>
+        </div>
+
+        <!-- データテーブル -->
+        <table id="metadataTable" class="data-table hidden">
+          <thead id="tableHead">
+            <!-- 動的ヘッダー（ファイル名、メタデータ1、メタデータ2...） -->
+          </thead>
+          <tbody id="tableBody">
+            <!-- 動的データ行 -->
+          </tbody>
+        </table>
+
+        <!-- 検索結果ゼロ状態 -->
+        <div id="noMatchState" class="empty-state hidden">
+          <div class="empty-icon">🔍</div>
+          <h3>一致するアイテムが見つかりませんでした</h3>
+          <p>検索条件を変更してください。</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- フッター -->
+    <footer class="app-footer">
+      <p>Box Metadata Viewer &bull; Powered by Box REST API</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
