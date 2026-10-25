@@ -58,6 +58,18 @@ const elements = {
   tableHead: document.getElementById('tableHead'),
   tableBody: document.getElementById('tableBody'),
   noMatchState: document.getElementById('noMatchState'),
+
+  // AIモーダル関連
+  aiModal: document.getElementById('aiModal'),
+  modalFileName: document.getElementById('modalFileName'),
+  modalLoading: document.getElementById('modalLoading'),
+  modalSummaryContent: document.getElementById('modalSummaryContent'),
+  summaryText: document.getElementById('summaryText'),
+  modalError: document.getElementById('modalError'),
+  modalErrorMessage: document.getElementById('modalErrorMessage'),
+  closeModalBtn: document.getElementById('closeModalBtn'),
+  closeModalFooterBtn: document.getElementById('closeModalFooterBtn'),
+  copySummaryBtn: document.getElementById('copySummaryBtn'),
 };
 
 // 初期化
@@ -126,6 +138,30 @@ function setupEventListeners() {
 
   // CSVエクスポート
   elements.exportCsvBtn.addEventListener('click', exportTableToCsv);
+
+  // AIモーダル操作
+  elements.closeModalBtn.addEventListener('click', closeAiModal);
+  elements.closeModalFooterBtn.addEventListener('click', closeAiModal);
+  elements.aiModal.addEventListener('click', (e) => {
+    if (e.target === elements.aiModal) closeAiModal();
+  });
+  elements.copySummaryBtn.addEventListener('click', () => {
+    const text = elements.summaryText.textContent;
+    if (text) {
+      navigator.clipboard.writeText(text).then(() => {
+        elements.copySummaryBtn.textContent = 'コピー完了！';
+        setTimeout(() => {
+          elements.copySummaryBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            要約をコピー
+          `;
+        }, 2000);
+      });
+    }
+  });
 }
 
 // デモ用ダミーデータの読み込み
@@ -443,19 +479,39 @@ function renderTableBody(items) {
       : `<span class="item-icon file" title="ファイル">📄</span>`;
     tr.appendChild(tdIcon);
 
-    // 2. ファイル名 (Boxへのリンク)
+    // 2. ファイル名 (Boxへのリンク + AI要約ボタン)
     const tdName = document.createElement('td');
     const boxLink = isFolder
       ? `https://app.box.com/folder/${item.id}`
       : `https://app.box.com/file/${item.id}`;
 
-    tdName.innerHTML = `
-      <div class="file-cell">
-        <a href="${boxLink}" target="_blank" rel="noopener" class="file-link" title="Boxで開く">
-          ${escapeHtml(item.name)}
-        </a>
-      </div>
-    `;
+    const cellDiv = document.createElement('div');
+    cellDiv.className = 'file-cell';
+
+    const linkEl = document.createElement('a');
+    linkEl.href = boxLink;
+    linkEl.target = '_blank';
+    linkEl.rel = 'noopener';
+    linkEl.className = 'file-link';
+    linkEl.title = 'Boxで開く';
+    linkEl.textContent = item.name;
+    cellDiv.appendChild(linkEl);
+
+    // ファイルの場合のみ「✨ AI要約」ボタンを表示
+    if (!isFolder) {
+      const aiBtn = document.createElement('button');
+      aiBtn.type = 'button';
+      aiBtn.className = 'btn-ai-summary';
+      aiBtn.title = 'Box AI でこの文書を要約';
+      aiBtn.innerHTML = `<span>✨</span> 要約`;
+      aiBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openAiSummaryModal(item);
+      });
+      cellDiv.appendChild(aiBtn);
+    }
+
+    tdName.appendChild(cellDiv);
     tr.appendChild(tdName);
 
     // 3. メタデータカラム
@@ -623,4 +679,109 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// ----------------------------------------------------
+// Box AI 連携ロジック (アイデア 1: ワンクリックAI文書要約)
+// ----------------------------------------------------
+
+// デモ用プリセット要約データ
+const DEMO_AI_SUMMARIES = {
+  '1001': '【事業企画書 要約】\n1. 2026年度の全社DX推進方針および新規事業開発のロードマップを策定。\n2. クラウドインフラの統合とBoxメタデータを活用した文書管理の自動化を計画。\n3. 年間投資対効果として業務時間を前年比25%削減することを目標としている。',
+  '1002': '【営業実績一覧 要約】\n1. 第3四半期の売上達成率は目標比108%と好調に推移。\n2. 特にクラウド移行支援サービスが前年同期比で40%増収を記録。\n3. 一方で製造業セグメントの案件クロージングに遅れがあり、次期への対策が急務。',
+  '1003': '【仕様書 v2 要約】\n1. WebフロントエンドとBox REST API連携による動的メタデータ描画仕様を定義。\n2. ユーザー認証およびCCGサーバー間認証によるセキュリティ要件を追記。\n3. リアルタイム検索フィルターとCSV出力機能の要件を満たす設計。',
+  '1004': '【秘密保持契約書 要約】\n1. 業務委託に伴う機密情報の定義と開示目的の限定を明記。\n2. 契約の有効期間は締結日より2年間、情報の秘密保持義務は終了後3年間継続。\n3. 違反時の損害賠償責任および管轄裁判所に関する条項を整備。',
+};
+
+// AI要約モーダルを開く
+async function openAiSummaryModal(item) {
+  elements.modalFileName.textContent = item.name;
+  elements.summaryText.textContent = '';
+  elements.modalError.classList.add('hidden');
+  elements.modalSummaryContent.classList.add('hidden');
+  elements.modalLoading.classList.remove('hidden');
+  elements.copySummaryBtn.disabled = true;
+  elements.aiModal.classList.remove('hidden');
+
+  try {
+    // デモアイテムの場合
+    if (DEMO_AI_SUMMARIES[item.id]) {
+      await new Promise(resolve => setTimeout(resolve, 800)); // AI思考アニメーション
+      displaySummaryResult(DEMO_AI_SUMMARIES[item.id]);
+      return;
+    }
+
+    // 本番Box API呼び出し
+    const token = elements.devTokenInput.value.trim();
+    if (!token) {
+      throw { message: '開発者トークンが入力されていません。' };
+    }
+
+    const summary = await requestBoxAiSummary(item.id, token);
+    displaySummaryResult(summary);
+  } catch (err) {
+    console.error('Box AI Error:', err);
+    elements.modalLoading.classList.add('hidden');
+    elements.modalError.classList.remove('hidden');
+
+    let msg = 'Box AI APIの呼び出しに失敗しました。';
+    if (err.status === 403) {
+      msg = 'Box AIの利用権限がありません。Box Developer Consoleの「構成」タブ ➔「アプリケーションスコープ」で「Box AIの管理と使用 (Manage Box AI)」にチェックを入れ、開発者トークンを再生成してください。';
+    } else if (err.status === 404) {
+      msg = '対象ファイルの内容が見つからないか、AI解析に対応していないファイル形式です（対応例: PDF, DOCX, TXTなど）。';
+    } else if (err.message) {
+      msg = err.message;
+    }
+    elements.modalErrorMessage.textContent = msg;
+  }
+}
+
+// Box AI API: POST /2.0/ai/ask を呼び出し
+async function requestBoxAiSummary(fileId, token) {
+  const url = 'https://api.box.com/2.0/ai/ask';
+  
+  const bodyData = {
+    mode: 'single_item_qa',
+    prompt: 'このドキュメントの要点を日本語で3行以内でわかりやすく要約してください。箇条書き形式で重要なポイントを整理してください。',
+    items: [
+      {
+        id: String(fileId),
+        type: 'file',
+      },
+    ],
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(bodyData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw {
+      status: response.status,
+      statusText: response.statusText,
+      message: errorData.message || `APIエラー (${response.status})`,
+    };
+  }
+
+  const result = await response.json();
+  return result.answer || '要約を取得できませんでした。';
+}
+
+// 要約結果をモーダルに表示
+function displaySummaryResult(text) {
+  elements.modalLoading.classList.add('hidden');
+  elements.summaryText.textContent = text;
+  elements.modalSummaryContent.classList.remove('hidden');
+  elements.copySummaryBtn.disabled = false;
+}
+
+// AIモーダルを閉じる
+function closeAiModal() {
+  elements.aiModal.classList.add('hidden');
 }

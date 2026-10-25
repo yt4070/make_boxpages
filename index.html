@@ -66,6 +66,13 @@
             <p>アプリの「構成」タブにある「開発者トークンを生成」ボタンを押し、コピーしたトークンを下部フォームに貼り付けます（有効期間1時間）。</p>
           </div>
         </div>
+        <div class="guide-step">
+          <span class="step-num">4</span>
+          <div>
+            <strong>Box AI を使用する場合 (オプション)</strong>
+            <p>「構成」タブの「アプリケーションスコープ」で <code>Box AIの管理と使用 (Manage Box AI)</code> にチェックを入れて保存し、トークンを再生成してください。</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -186,6 +193,54 @@
         </div>
       </div>
     </main>
+
+    <!-- AI要約モーダル -->
+    <div id="aiModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="ai-badge">✨ Box AI</span>
+            <h3 id="modalTitle" class="modal-title">文書の要約</h3>
+          </div>
+          <button type="button" id="closeModalBtn" class="icon-btn" aria-label="閉じる">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-target-file">
+            <span class="label-text">対象ファイル:</span>
+            <strong id="modalFileName">--</strong>
+          </div>
+
+          <!-- ローディング表示 -->
+          <div id="modalLoading" class="modal-loading">
+            <div class="spinner"></div>
+            <p>Box AI が文書を分析・要約しています...</p>
+          </div>
+
+          <!-- 要約結果テキスト -->
+          <div id="modalSummaryContent" class="summary-box hidden">
+            <div class="summary-text" id="summaryText"></div>
+          </div>
+
+          <!-- モーダル内エラー表示 -->
+          <div id="modalError" class="alert-banner error hidden">
+            <div class="alert-content">
+              <h4 id="modalErrorTitle">要約の取得に失敗しました</h4>
+              <p id="modalErrorMessage"></p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="copySummaryBtn" class="btn btn-secondary btn-sm" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            要約をコピー
+          </button>
+          <button type="button" id="closeModalFooterBtn" class="btn btn-primary btn-sm">閉じる</button>
+        </div>
+      </div>
+    </div>
 
     <!-- フッター -->
     <footer class="app-footer">
